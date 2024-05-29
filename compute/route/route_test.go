@@ -17,42 +17,56 @@ package snippets
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/golang-samples/internal/testutil"
 )
 
+func cleanup(t *testing.T, projectID, name string, buf *bytes.Buffer) error {
+	expectedResult := fmt.Sprintf("- %s", name)
+	if err := deleteRoute(buf, projectID, name); err != nil {
+		t.Fatalf("deleteRoute got error: %v", err)
+	}
+
+	expectedResult2 := "Route deleted"
+	if got := buf.String(); !strings.Contains(got, expectedResult2) {
+		t.Errorf("deleteRoute got %q, want %q", got, expectedResult)
+	}
+
+	if err := listRoutes(buf, projectID); err != nil {
+		t.Fatalf("listRoutes got error: %v", err)
+	}
+
+	if got := buf.String(); strings.Contains(got, expectedResult) {
+		t.Errorf("listInstances got %q, want %q", got, expectedResult)
+	}
+
+	buf.Reset()
+	return nil
+}
+
 func TestCreateRoute(t *testing.T) {
 	buf := &bytes.Buffer{}
 	tc := testutil.SystemTest(t)
-	name := "testname"
+	var r *rand.Rand = rand.New(
+		rand.NewSource(time.Now().UnixNano()))
+	name := fmt.Sprintf("testname-%v", r.Int())
 
 	if err := createRoute(buf, tc.ProjectID, name); err != nil {
 		t.Fatalf("createRoute got error: %v", err)
 	}
-
-	buf.Reset()
+	defer cleanup(t, tc.ProjectID, name, buf)
 
 	if err := listRoutes(buf, tc.ProjectID); err != nil {
 		t.Fatalf("listRoutes got error: %v", err)
 	}
 
-	expectedResult := fmt.Sprintf("- %s", "testname")
+	expectedResult := fmt.Sprintf("- %s", name)
 	if got := buf.String(); !strings.Contains(got, expectedResult) {
 		t.Errorf("listInstances got %q, want %q", got, expectedResult)
 	}
-
-	buf.Reset()
-
-	if err := deleteRoute(buf, tc.ProjectID, name); err != nil {
-		t.Fatalf("deleteRoute got error: %v", err)
-	}
-
-	expectedResult = "Route deleted"
-	if got := buf.String(); !strings.Contains(got, expectedResult) {
-		t.Errorf("deleteRoute got %q, want %q", got, expectedResult)
-	}
-
 	buf.Reset()
 }
